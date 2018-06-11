@@ -446,7 +446,8 @@
     .call(brush)
     .selectAll("rect")
     .attr("height", height2)
-      .attr("fill", "SkyBlue");  
+      .attr("fill", "SkyBlue");
+
 
   //for brusher of the slider bar at the bottom
   function brushed() {
@@ -478,6 +479,7 @@
     fund.select("path").transition()//update curve 
       .attr("d", function(d) { if(d.vis=="True"){return line(d.price_array);} else{ return null;} })
     focus.select(".x.axis").call(xAxis);
+      update(funds_percent);
   }
 
   //********************************************************************************//

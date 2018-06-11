@@ -64,9 +64,13 @@ function _init_funds(url){
 function find_max_min_selected_funds(data){
 	var max=-999999;
 	var min=999999;
-	for(var i=0;i<data.length;i++){
+
+	for(var i=0;i<=data.length-1;i++){
 		if(data[i].vis=="True"){
 			for(var j=0;j<data[i].price_array.length;j++){
+                var date=parseDate(data[i].price_array[j].datetime+" 23:59:59");
+                if(x(date) < 0 || x(date) > 950)
+                	continue;
 				var price=parseFloat(data[i].price_array[j].price);
 				if(price>max){
 					max=price;
