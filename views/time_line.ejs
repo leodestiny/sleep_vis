@@ -1,0 +1,631 @@
+<html>
+
+<head>
+    <title>D3 Axis Example</title>
+    <script src="http://d3js.org/d3.v3.js"></script>
+</head>
+<style>
+    body {
+        font: 11px sans-serif;
+    }
+
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
+
+    .start_line {
+        fill: none;
+        stroke: url(#line-gradient);
+        stroke-width: 1.5px;
+    }
+
+    .end_line {
+        fill: none;
+        stroke: url(#line-gradient);
+        stroke-width: 1.5px;
+    }
+
+</style>
+
+<body>
+
+<script>
+
+
+    function calc_start_average(data, limit) {
+        var y = new Array()
+        var index = 0;
+        var t = new Array();
+        var default_time = new Date(1970, 1, 2, 0, 30)
+        for (var i = data[0].date.getTime(); i <= data[data.length - 1].date.getTime(); i += 24 * 60 * 60 * 1000) {
+            if (t.length == limit) {
+                t.splice(0, 1);
+            }
+
+            if (i == data[index].date.getTime()) {
+                var l = data[index].start_sleep.split(":");
+                var h = +l[0], m = +l[1];
+
+                var d = new Date(1970, 1, 1, h, m);
+                if (h < 12) {
+                    d.setDate(2);
+                }
+                t.push(d.getTime());
+                index++;
+            }
+            else {
+                t.push(default_time.getTime());
+            }
+
+            y.push({
+                date: new Date(i),
+                time: new Date(eval(t.join("+")) / t.length)
+            })
+
+        }
+        return y
+
+    }
+
+    function calc_end_average(data, limit) {
+        var y = new Array()
+        var index = 0;
+        var t = new Array();
+        var default_time = new Date(1970, 1, 1, 8, 0)
+        for (var i = data[0].date.getTime(); i <= data[data.length - 1].date.getTime(); i += 24 * 60 * 60 * 1000) {
+            if (t.length == limit) {
+                t.splice(0, 1);
+            }
+
+            if (i == data[index].date.getTime()) {
+                var l = data[index].end_sleep.split(":");
+                var h = +l[0], m = +l[1];
+
+                var d = new Date(1970, 1, 1, h, m);
+                t.push(d.getTime());
+                index++;
+            }
+            else {
+                t.push(default_time.getTime());
+            }
+
+            y.push({
+                date: new Date(i),
+                time: new Date(eval(t.join("+")) / t.length)
+            })
+
+        }
+        return y
+    }
+
+
+    var plot_height = 300;
+    var slider_height = 100;
+    var blank_height = 50;
+    var margin = {
+            top: 20,
+            right: 300,
+            bottom: 30,
+            left: 40
+        },
+        width = 1260,
+        height = 3 * plot_height + slider_height + blank_height * 3;
+    var stack_data = [{id: 0, text: "grouped"}, {id: 1, text: "stacked"}];
+    var average_choice = 2;
+    var stack_choice = 0;
+    var colors = d3.scale.category20();
+    var part_x = d3.time.scale()
+        .range([0, width]);
+    var full_x = d3.time.scale()
+        .range([0, width]);
+    var start_y = d3.time.scale()
+        .range([plot_height, 0]);
+    var end_y = d3.time.scale()
+        .range([plot_height, 0]);
+
+    function find_minmax_on_data(data) {
+        var min = new Date(1970, 1, 3, 0, 0);
+        var max = new Date(1970, 1, 1, 0, 0);
+        for (var i of data) {
+            if (min > i.time) {
+                min = i.time;
+            }
+            if (max < i.time) {
+                max = i.time;
+            }
+        }
+        return [min, max];
+    }
+
+    function find_minmax_on_filter_data(data) {
+        var min = new Date(1970, 1, 3, 0, 0);
+        var max = new Date(1970, 1, 1, 0, 0);
+        for (var i of data) {
+            if (part_x(i.date) < 0 || part_x(i.date) > width) {
+                continue;
+            }
+            if (min > i.time) {
+                min = i.time;
+            }
+            if (max < i.time) {
+                max = i.time;
+            }
+        }
+        return [min, max];
+    }
+
+    function get_time_domain(data) {
+        var domain = find_minmax_on_data(data);
+        var min = new Date(domain[0].getTime());
+        var max = new Date(domain[1].getTime());
+        return [min, max];
+
+    }
+
+    d3.csv("/fitbit_analysis.csv", function (data) {
+        var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
+        for (var i = 0; i < data.length; ++i) {
+            data[i].date = parseDate(data[i].date + " 12:00:00")
+        }
+
+
+        var start_time_array = []
+        var end_time_array = []
+        for (var i of [1, 7, 14, 30, 90, 180]) {
+            start_time_array.push({
+                "limit": i,
+                "id": start_time_array.length,
+                "data": calc_start_average(data, i)
+            })
+            end_time_array.push({
+                "limit": i,
+                "id": end_time_array.length,
+                "data": calc_end_average(data, i)
+            });
+        }
+
+
+        var part_x_axis = d3.svg.axis()
+            .scale(part_x)
+            .tickFormat(d3.time.format("%Y-%m-%d"))
+            .orient("bottom");
+        var full_x_axis = d3.svg.axis()
+            .scale(full_x)
+            .tickFormat(d3.time.format("%Y-%m-%d"))
+            .orient("bottom");
+        var start_y_axis = d3.svg.axis()
+            .scale(start_y)
+            .tickFormat(d3.time.format("%H:%M"))
+            .orient("left");
+        var end_y_axis = d3.svg.axis()
+            .scale(end_y)
+            .tickFormat(d3.time.format("%H:%M"))
+            .orient("left");
+
+        part_x.domain([data[0].date, data[data.length - 1].date]);
+        full_x.domain(part_x.domain());
+        start_y.domain(get_time_domain(start_time_array[average_choice].data));
+        end_y.domain(get_time_domain(end_time_array[average_choice].data));
+
+        var start_time_line = d3.svg.line()
+            .interpolate("basis")
+            .x(function (d) {
+                if (part_x(d.date) < 0)
+                    return 0;
+                else if (part_x(d.date) > width)
+                    return width;
+                else
+                    return part_x(d.date);
+            })
+            .y(function (d) {
+                if (start_y(d.time) < 0)
+                    return 0;
+                else if (start_y(d.time) > plot_height)
+                    return plot_height;
+                else
+                    return start_y(d.time);
+            });
+
+        var end_time_line = d3.svg.line()
+            .interpolate("basis")
+            .x(function (d) {
+                if (part_x(d.date) < 0)
+                    return 0;
+                else if (part_x(d.date) > width)
+                    return width;
+                else
+                    return part_x(d.date);
+            })
+            .y(function (d) {
+                if (end_y(d.time) < 0)
+                    return 0;
+                else if (end_y(d.time) > plot_height)
+                    return plot_height;
+                else
+                    return end_y(d.time);
+            });
+
+        // create an svg container
+        var svg = d3.select("body").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+
+
+        /*//draw stacked plot
+        var stack_plot = svg.append("g")
+            .attr("width",width)
+            .attr("height",plot_height)
+            .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+        stack_plot.append("g")
+            .attr("class", "x axis")
+            .attr("transform","translate(" + margin.left + ","+plot_height+")")
+            .call(part_x_axis);
+
+        var stack_legend = stack_plot.selectAll(".legend")
+            .data(stack_data)
+            .enter()
+            .append("g")
+            .attr("class","stack_legend")
+            .attr("transform","translate(" + (margin.left + width+10) + ",0)");
+
+        stack_legend.append("rect")
+            .attr("height",20)
+            .attr("width",30)
+            .attr("x",function (d) {
+                return 0;
+            })
+            .attr("y",function (d) {
+                return 30 * d.id;
+            })
+            .attr("stroke",function (d) {
+                return colors(d.id);
+            })
+            .attr("fill",function (d) {
+                if(stack_choice == d.id){
+                    return colors(d.id);
+                }
+                else{
+                    return "white";
+                }
+            })
+            .on("click",function (d) {
+                stack_choice = d.id;
+                update_stack();
+            });
+
+
+
+        stack_legend.append("text")
+            .attr("x", 50)
+            .attr("y", function (d) {
+                return 30 * d.id;
+            })
+            .attr("dy", "1em")
+            .style("text-anchor", "begin")
+            .text(function(d) {
+                return d.text;
+            })
+            .attr("fill",function (d) {
+                return colors(d.id);
+            });
+*/
+
+
+        // draw sleep end time plot
+        var end_time_plot = svg.append("g")
+            .attr("width", width)
+            .attr("height", plot_height)
+            .attr("transform", "translate(" + margin.left + "," + (margin.top) + ")")
+
+        end_time_plot.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(" + margin.left + "," + plot_height + ")")
+            .call(part_x_axis);
+
+        end_time_plot.append("g")
+            .attr("class", "y axis")
+            .attr("transform", "translate(" + margin.left + ",0)")
+            .call(end_y_axis)
+            .append("text")
+            .attr("y", -20)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Sleep End Time");
+
+        end_time_plot.selectAll(".end_line")
+            .data(end_time_array)
+            .enter()
+            .append("path")
+            .attr("class", "end_line")
+            .attr("transform", "translate(" + margin.left + ",0)")
+            .attr("d", function (d) {
+                if (d.id == average_choice)
+                    return end_time_line(d.data);
+                else {
+                    return null
+                }
+            });
+
+        var average_legend = end_time_plot.selectAll(".legend")
+            .data(end_time_array)
+            .enter()
+            .append("g")
+            .attr("class", "average_legend")
+            .attr("transform", "translate(" + (margin.left + width + 10) + ",0)");
+
+        average_legend.append("rect")
+            .attr("height", 20)
+            .attr("width", 30)
+            .attr("x", function (d) {
+                return 0;
+            })
+            .attr("y", function (d) {
+                return 30 * d.id;
+            })
+            .attr("stroke", function (d) {
+                return colors(d.id);
+            })
+            .attr("fill", function (d) {
+                if (average_choice == d.id) {
+                    return colors(d.id);
+                }
+                else {
+                    return "white";
+                }
+            })
+            .on("click", function (d) {
+                average_choice = d.id;
+                update_line();
+            });
+
+
+        average_legend.append("text")
+            .attr("x", 50)
+            .attr("y", function (d) {
+                return 30 * d.id;
+            })
+            .attr("dy", "1em")
+            .style("text-anchor", "begin")
+            .text(function (d) {
+                return d.limit + " days time average";
+            })
+            .attr("fill", function (d) {
+                return colors(d.id);
+            });
+
+
+        // draw sleep start time plot
+        var start_time_plot = svg.append("g")
+            .attr("width", width)
+            .attr("height", plot_height)
+            .attr("transform", "translate(" + margin.left + "," + (margin.top + plot_height + blank_height) + ")");
+
+        start_time_plot.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(" + margin.left + "," + plot_height + ")")
+            .call(part_x_axis);
+
+        start_time_plot.append("g")
+            .attr("class", "y axis")
+            .attr("transform", "translate(" + margin.left + ",0)")
+            .call(start_y_axis)
+            .append("text")
+            .attr("y", -20)
+            .attr("x", 10)
+            .attr("dy", "1em")
+            .style("text-anchor", "end")
+            .text("Sleep Start Time");
+
+        start_time_plot.selectAll(".start_line")
+            .data(start_time_array)
+            .enter()
+            .append("path")
+            .attr("class", "start_line")
+            .attr("transform", "translate(" + margin.left + ",0)")
+            .attr("d", function (d) {
+                if (d.id == average_choice)
+                    return start_time_line(d.data);
+                else {
+                    return null;
+                }
+            })
+            .attr("fill", "none");
+
+        // change line color using linear gradient
+        svg.append("linearGradient")
+            .attr("id", "line-gradient")
+            .attr("x1", 0).attr("y1", "100%")
+            .attr("x2", 0).attr("y2", "0")
+            .selectAll("stop")
+            .data([
+                {offset: "0%", color: "#6fff37"},
+                {offset: "35%", color: "#31e62c"},
+                {offset: "50%", color: "#000000"},
+                {offset: "65%", color: "#e5534d"},
+                {offset: "100%", color: "#ff180e"}
+            ])
+            .enter().append("stop")
+            .attr("offset", function (d) {
+                return d.offset;
+            })
+            .attr("stop-color", function (d) {
+                return d.color;
+            });
+
+
+        var slider_plot = svg.append("g")
+            .attr("widht", width)
+            .attr("height", slider_height)
+            .attr("transform", "translate(" + margin.left + "," + (margin.top + 2 * plot_height + 2 * blank_height) + ")");
+
+
+        // draw slider and brush
+
+        var brush = d3.svg.brush()
+            .x(full_x)
+            .on("brush", brushed);
+
+
+        slider_plot.append("g")
+            .attr("transform", "translate(" + margin.left + "," + plot_height / 2 + ")")
+            .call(full_x_axis);
+
+        var slider_area = d3.svg.area()
+            .interpolate("monotone")
+            .x(function (d) {
+                return full_x(d.date);
+            })
+            .y0(plot_height / 2)
+            .y1(0);
+        var all_time_data = [{date: data[0].date}, {date: data[data.length - 1].date}]
+
+
+        slider_plot.append("path")
+            .attr("class", "area")
+            .attr("d", slider_area(all_time_data))
+            .attr("fill", "LightYellow")
+            .attr("transform", "translate(" + margin.left + ",0)");
+
+        var time_segment = []
+        for (var i = 0; i < 10; ++i) {
+            time_segment.push([
+                    {date: data[parseInt(data.length / 20 * i)].date},
+                    {date: data[parseInt(data.length / 20 * (i+1))].date}
+                ]
+            )
+        }
+
+        slider_plot.selectAll(".time_segment")
+            .data(time_segment)
+            .enter()
+            .append("path")
+            .attr("class","area")
+            .attr("d",function (d) {
+                return slider_area(d);
+            })
+            .attr("fill",function (d,i) {
+                return colors(i);
+            })
+            .attr("transform", "translate(" + margin.left + ",0)");
+
+        slider_plot.append("g")
+            .attr("class", "x brush")
+            .call(brush)
+            .selectAll("rect")
+            .attr("height", plot_height / 2)
+            .attr("transform", "translate(" + margin.left + ",0)")
+            .attr("fill", "gray")
+            .attr("opacity","0.5");
+
+
+        function update_line() {
+            average_legend.select("rect").transition()
+                .attr("fill", function (d) {
+                    if (average_choice == d.id) {
+                        return colors(d.id);
+                    }
+                    else {
+                        return "white";
+                    }
+                });
+
+            end_y.domain(find_minmax_on_filter_data(end_time_array[average_choice].data));
+            end_time_plot.select(".y.axis")
+                .transition()
+                .duration(1000)
+                .call(end_y_axis);
+
+
+            end_time_plot.selectAll(".end_line")
+                .transition()
+                .attr("d", function (d) {
+                    if (d.id == average_choice) {
+                        return end_time_line(d.data);
+                    }
+                    else {
+                        return null;
+                    }
+                });
+
+
+            start_y.domain(find_minmax_on_filter_data(start_time_array[average_choice].data));
+            start_time_plot.select(".y.axis")
+                .transition()
+                .duration(1000)
+                .call(start_y_axis);
+
+            start_time_plot.selectAll(".start_line")
+                .transition()
+                .duration(1000)
+                .attr("d", function (d) {
+                    if (d.id == average_choice)
+                        return start_time_line(d.data);
+                    else {
+                        return null
+                    }
+                });
+
+        }
+
+        function brushed() {
+            part_x.domain(brush.empty() ? full_x.domain() : brush.extent());
+
+
+            svg.selectAll(".x.axis")
+                .transition()
+                .duration(1000)
+                .call(part_x_axis);
+
+            end_time_plot.selectAll(".end_line")
+                .transition()
+                .duration(1000)
+                .attr("d", function (d) {
+                    if (d.id == average_choice) {
+                        return end_time_line(d.data);
+                    }
+                    else {
+                        return null;
+                    }
+                });
+
+            start_time_plot.selectAll(".start_line")
+                .transition()
+                .duration(1000)
+                .attr("d", function (d) {
+                    if (d.id == average_choice)
+                        return start_time_line(d.data);
+                    else {
+                        return null
+                    }
+                })
+                .attr("width", width);
+
+            update_line();
+
+        }
+
+        /*function update_stack() {
+            stack_legend.select("rect").transition()
+                .attr("fill",function (d) {
+                    if(stack_choice == d.id){
+                        return colors(d.id);
+                    }
+                    else{
+                        return "white";
+                    }
+                });
+
+        }*/
+
+    })
+
+
+</script>
+
+</body>
+
+</html>

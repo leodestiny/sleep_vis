@@ -1,7 +1,7 @@
   /**
   * Global Variables
   */  
-  var mode="actual";//actual price || percentage change
+  var mode="percentage";//actual price || percentage change
   var margin = {top: 15, right: 50, bottom: 100, left: 50},
       margin2 = {top: 515, right: 50, bottom: 50, left: 50},
       width = 1200 - margin.left - margin.right,
@@ -13,7 +13,6 @@
   var x;//x-axis; d3 obj
 
   //other var for preference settings
-  var shownAllFidelity=false;
   var shownAllJPM=false;
 
   /**
@@ -45,13 +44,10 @@
      * Switch btn at the top, which allow users to select between 2 modes:
      * actual: showing the actual unit price of each fund
      * percent: showing the percentage change of price, in this case, it eliminate the effect of unit price size
-     * , and allow meaningful comparison of fund performance 
-     */  
+     * , and allow meaningful comparison of fund performance
+     */
     $("[name='my-checkbox']").bootstrapSwitch();
     $('input[name="my-checkbox"]').on('switchChange.bootstrapSwitch', function(event, state) {
-      //console.log(this); // DOM element
-      //console.log(event); // jQuery event
-      //console.log(state); // true | false
 
       if(state==true){//state true means that $ is selected , else % is selected
         //console.log("actual price is selected to display");
@@ -60,7 +56,7 @@
 
         focus.select(".y.axis").select(".yaxisLabel").transition()
         .text("Actual Price $");//update axis label
-    
+
         update(funds_actual);
 
       }else{
@@ -101,14 +97,14 @@
               } //end for price array
 
             }//end for fund loop
-        } 
-  
+        }
+
         update(funds_percent);
 
       }//end mode if
 
 
-    });//end switch listener 
+    });//end switch listener
 
 
 
@@ -151,7 +147,7 @@
   x2.domain(x.domain());//the domain axis for the bar at the bottom
   
   var line = d3.svg.line()
-    .interpolate("linear")
+    .interpolate("basis")
     .x(function(d) { return x(parseDate(d.datetime+" 12:00:00")); })
     .y(function(d) { return y(parseFloat(d.price));   });
 
@@ -204,38 +200,7 @@
     .attr("font-family", "sans-serif")
     .attr("font-size", "30px")
     .attr("fill", "black");  
-  focus.append("text")
-    .attr("class", "fundCategory")
-    .attr("x", function(d) { return width-100; })
-    .attr("y", 300)
-    .text( "Fidelity Funds")
-    .on("click", function(){
-      //on click allow select all Fidelity Funds
-      if(mode=="actual") return;
-      var vis="";
-      if(shownAllFidelity){
-        vis="False";
-        shownAllFidelity=false;
-      }else{
-        vis="True";
-        shownAllFidelity=true;
-      }
-      for(var i=13;i<funds_actual.length;i++)
-        funds_percent[i].vis=vis;
-      update(funds_percent);
-          
-    })
-    .attr("font-family", "sans-serif")
-    .attr("font-size", "30px")
-    .attr("fill", "black");  
-
   //tooltip
-  var div = d3.select("body").append("div")   
-    .attr("class", "D3tooltip")               
-    .style("opacity", 0);
-
-  var DateLbl = focus.append("g")  //the date label at the right upper corner part
-    .attr("class", "dateLabel");
 
   var horizontalZeroLine=focus.append("line")
        .style("stroke-dasharray", ("3, 3"))
@@ -265,9 +230,10 @@
   //********************************************************************************//  
   var fund;
   function update(data) {
+  
 
     y.domain([find_max_min_selected_funds(data).min-1,find_max_min_selected_funds(data).max+1]);
-    focus.select(".y.axis").call(yAxis);
+    focus.select(".y.axis").transition().duration(1000).call(yAxis);
 
     updateHorizontalZeroLine();
 
@@ -431,13 +397,15 @@
     datetime:maxDate,
     price:"0"
   };
-  var sampleFundPriceArray=funds_actual[0].price_array.slice();
+  var sampleFundPriceArray=[];
   sampleFundPriceArray.push(dummyObjToIncludeMaxdate);
   sampleFundPriceArray.push(dummyObjToIncludeMindate);
 
+  console.log(sampleFundPriceArray);
+
   context.append("path")
     .attr("class", "area")
-    .attr("d", contextArea(sampleFundPriceArray))
+      .attr("d", contextArea(sampleFundPriceArray))
     .attr("fill", "LightYellow ");
     
   //append the brush for the selection of subsection  
@@ -487,7 +455,6 @@
 
 
   function percentageRebase(value) {
-      //console.log(slideEvt.value);
       //update funds_percent (recalculate) and redraw it
       for(var i=0;i<funds_percent.length;i++){
 
